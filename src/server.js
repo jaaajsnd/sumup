@@ -44,6 +44,36 @@ app.get('/health', (req, res) => {
   res.json({ status: 'healthy' });
 });
 
+app.get('/test', (req, res) => {
+  res.send(`
+    <html>
+      <head>
+        <title>SumUp Test</title>
+        <style>
+          body { font-family: Arial; padding: 50px; background: #f5f5f5; }
+          .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+          h1 { text-align: center; margin-bottom: 30px; }
+          button { width: 100%; padding: 15px; background: #000; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+          button:hover { background: #333; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>SumUp Card Test</h1>
+          <form method="POST" action="/checkout">
+            <input type="hidden" name="amount" value="10.00">
+            <input type="hidden" name="currency" value="EUR">
+            <input type="hidden" name="order_id" value="TEST-123">
+            <input type="hidden" name="return_url" value="https://google.com">
+            <input type="hidden" name="cart_items" value='{"items":[{"title":"Test Product","quantity":1,"price":1000,"line_price":1000}]}'>
+            <button type="submit">Start Test Checkout €10.00</button>
+          </form>
+        </div>
+      </body>
+    </html>
+  `);
+});
+
 app.post('/api/save-customer-data', async (req, res) => {
   try {
     const { checkoutId, customerData, cartData } = req.body;
