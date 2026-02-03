@@ -21,7 +21,7 @@ const pendingOrders = new Map();
 
 const translations = {
   nl: {
-    title: 'Betalen met Kaart',
+    title: 'Checkout',
     customer_info: 'Klantinformatie',
     first_name: 'Voornaam',
     last_name: 'Achternaam',
@@ -44,7 +44,7 @@ const translations = {
     locale: 'nl-NL'
   },
   es: {
-    title: 'Pagar con Tarjeta',
+    title: 'Pagar',
     customer_info: 'Información del Cliente',
     first_name: 'Nombre',
     last_name: 'Apellidos',
@@ -67,7 +67,7 @@ const translations = {
     locale: 'es-ES'
   },
   en: {
-    title: 'Pay with Card',
+    title: 'Checkout',
     customer_info: 'Customer Information',
     first_name: 'First name',
     last_name: 'Last name',
