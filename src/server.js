@@ -8,7 +8,10 @@ const PORT = process.env.PORT || 10000;
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static('public'));
 
+const SUMUP_API_KEY = process.env.SUMUP_API_KEY || 'sup_sk_btkVjoMOqjRgBnJDe3HfRu6QY44IWUHi0';
+const SUMUP_BASE_URL = 'https://api.sumup.com/v0.1';
 const APP_URL = process.env.APP_URL || 'http://localhost:10000';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -29,62 +32,12 @@ async function sendTelegramMessage(text) {
   }
 }
 
-function setupTelegramWebhook() {
-  app.post(`/webhook/${TELEGRAM_BOT_TOKEN}`, async (req, res) => {
-    try {
-      const { message } = req.body;
-      
-      if (message && message.text && message.text.startsWith('/pay ')) {
-        const parts = message.text.split(' ');
-        
-        if (parts.length >= 3) {
-          const orderId = parts[1];
-          const paymentLink = parts.slice(2).join(' ');
-          
-          if (pendingOrders.has(orderId)) {
-            const order = pendingOrders.get(orderId);
-            order.paymentLink = paymentLink;
-            pendingOrders.set(orderId, order);
-            
-            await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-              chat_id: message.chat.id,
-              text: `✅ Enlace de pago establecido para pedido ${orderId}\n\nEl cliente será redirigido automáticamente.`,
-              parse_mode: 'HTML'
-            });
-          } else {
-            await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-              chat_id: message.chat.id,
-              text: `❌ Pedido ${orderId} no encontrado o expirado.`,
-              parse_mode: 'HTML'
-            });
-          }
-        } else {
-          await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-            chat_id: message.chat.id,
-            text: `❌ Formato inválido. Use: /pay 1234 https://enlace-pago.com`,
-            parse_mode: 'HTML'
-          });
-        }
-      }
-      
-      res.sendStatus(200);
-    } catch (error) {
-      console.error('Webhook error:', error);
-      res.sendStatus(500);
-    }
-  });
-  
-  axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook`, {
-    url: `${APP_URL}/webhook/${TELEGRAM_BOT_TOKEN}`
-  }).then(() => {
-    console.log('Telegram webhook set up successfully');
-  }).catch(error => {
-    console.error('Failed to set up webhook:', error.message);
-  });
-}
-
 app.get('/', (req, res) => {
-  res.json({ status: 'active', message: 'Manual Payment Gateway España' });
+  res.json({ 
+    status: 'active',
+    message: 'SumUp Card Gateway Nederland',
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.get('/health', (req, res) => {
@@ -95,7 +48,7 @@ app.get('/test', (req, res) => {
   res.send(`
     <html>
       <head>
-        <title>Test de Pago</title>
+        <title>SumUp Test</title>
         <style>
           body { font-family: Arial; padding: 50px; background: #f5f5f5; }
           .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -106,14 +59,14 @@ app.get('/test', (req, res) => {
       </head>
       <body>
         <div class="container">
-          <h1>Test de Pago</h1>
+          <h1>SumUp Card Test</h1>
           <form method="POST" action="/checkout">
             <input type="hidden" name="amount" value="10.00">
             <input type="hidden" name="currency" value="EUR">
-            <input type="hidden" name="order_id" value="TEST">
+            <input type="hidden" name="order_id" value="TEST-123">
             <input type="hidden" name="return_url" value="https://google.com">
-            <input type="hidden" name="cart_items" value='{"items":[{"title":"Producto Test","quantity":1,"price":1000,"line_price":1000}]}'>
-            <button type="submit">Iniciar Test €10.00</button>
+            <input type="hidden" name="cart_items" value='{"items":[{"title":"Test Product","quantity":1,"price":1000,"line_price":1000}]}'>
+            <button type="submit">Start Test Checkout €10.00</button>
           </form>
         </div>
       </body>
@@ -121,11 +74,86 @@ app.get('/test', (req, res) => {
   `);
 });
 
+app.post('/api/save-customer-data', async (req, res) => {
+  try {
+    const { checkoutId, customerData, cartData } = req.body;
+    
+    if (!checkoutId || !customerData) {
+      return res.status(400).json({ status: 'error', message: 'Missing data' });
+    }
+    
+    const checkoutResponse = await axios.get(`${SUMUP_BASE_URL}/checkouts/${checkoutId}`, {
+      headers: {
+        'Authorization': `Bearer ${SUMUP_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const checkout = checkoutResponse.data;
+    
+    let productsText = '';
+    if (cartData && cartData.items) {
+      productsText = '\n\n<b>🛒 Producten:</b>\n';
+      cartData.items.forEach(item => {
+        const itemPrice = (item.line_price || (item.price * item.quantity)) / 100;
+        productsText += `• ${item.quantity}x ${item.title} - €${itemPrice.toFixed(2)}\n`;
+      });
+    }
+    
+    const message = `
+<b>✅ BETALING ONTVANGEN - SUMUP CARD</b>
+
+<b>💰 Bedrag:</b> €${checkout.amount}
+<b>👤 Klant:</b> ${customerData.firstName} ${customerData.lastName}
+<b>📧 Email:</b> ${customerData.email}
+<b>📍 Adres:</b> ${customerData.address}, ${customerData.postalCode} ${customerData.city}
+<b>🆔 Checkout ID:</b> ${checkoutId}${productsText}
+
+<b>✓ Status:</b> Betaald
+    `.trim();
+    
+    await sendTelegramMessage(message);
+    
+    res.json({ status: 'success' });
+  } catch (error) {
+    console.error('Error:', error.message);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+app.get('/api/check-payment/:checkoutId', async (req, res) => {
+  const { checkoutId } = req.params;
+  
+  try {
+    const response = await axios.get(`${SUMUP_BASE_URL}/checkouts/${checkoutId}`, {
+      headers: {
+        'Authorization': `Bearer ${SUMUP_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const checkout = response.data;
+    let actualStatus = checkout.status;
+    
+    if (checkout.transactions && checkout.transactions.length > 0) {
+      const successfulTxn = checkout.transactions.find(txn => txn.status === 'SUCCESSFUL');
+      if (successfulTxn) {
+        actualStatus = 'PAID';
+      }
+    }
+    
+    res.json({ status: actualStatus, checkout: checkout });
+  } catch (error) {
+    console.error('Error:', error.message);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 app.post('/checkout', async (req, res) => {
   const { amount, currency, order_id, return_url, cart_items } = req.body;
   
   if (!amount || !currency) {
-    return res.status(400).send('Faltan parámetros requeridos');
+    return res.status(400).send('Verplichte parameters ontbreken');
   }
 
   let cartData = null;
@@ -136,230 +164,282 @@ app.post('/checkout', async (req, res) => {
       console.error('Error parsing cart_items:', e);
     }
   }
-  
-  const orderNumber = String(Math.floor(1000 + Math.random() * 9000));
 
-  res.send(`
-    <html>
-      <head>
-        <title>Pago - €${amount}</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f7f7f7; color: #333; line-height: 1.6; }
-          .checkout-container { display: flex; min-height: 100vh; }
-          .order-summary { width: 50%; background: #fafafa; padding: 60px 80px; border-right: 1px solid #e1e1e1; }
-          .cart-items { margin-bottom: 30px; }
-          .cart-item { display: flex; gap: 15px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e1e1e1; }
-          .item-image { width: 64px; height: 64px; background: #e1e1e1; border-radius: 8px; position: relative; }
-          .item-quantity { position: absolute; top: -8px; right: -8px; background: #717171; color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
-          .item-details { flex: 1; }
-          .item-name { font-weight: 500; font-size: 14px; }
-          .item-price { font-weight: 500; font-size: 14px; }
-          .summary-section { padding: 20px 0; border-top: 1px solid #e1e1e1; }
-          .summary-row { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; }
-          .summary-row.total { font-size: 18px; font-weight: 600; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e1e1e1; }
-          .payment-form { width: 50%; background: white; padding: 60px 80px; }
-          .section { margin-bottom: 30px; }
-          .section-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
-          .form-group { margin-bottom: 12px; }
-          label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
-          input { width: 100%; padding: 12px 14px; border: 1px solid #d9d9d9; border-radius: 5px; font-size: 14px; }
-          input:focus { outline: none; border-color: #2c6ecb; }
-          .form-row { display: flex; gap: 12px; }
-          .form-row .form-group { flex: 1; }
-          .pay-button { width: 100%; padding: 18px; background: #2c6ecb; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 24px; }
-          .pay-button:hover { background: #1f5bb5; }
-          .loading-screen { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 9999; }
-          .loading-screen.show { display: flex; align-items: center; justify-content: center; }
-          .loading-box { background: white; padding: 40px 60px; border-radius: 15px; text-align: center; max-width: 500px; }
-          .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #2c6ecb; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
-          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-          .loading-title { font-size: 24px; font-weight: 600; margin-bottom: 10px; }
-          .loading-text { color: #666; font-size: 14px; line-height: 1.6; }
-          @media (max-width: 1000px) { .checkout-container { flex-direction: column-reverse; } .order-summary, .payment-form { width: 100%; padding: 30px 20px; } }
-        </style>
-      </head>
-      <body>
-        <div class="loading-screen" id="loadingScreen">
-          <div class="loading-box">
-            <div class="spinner"></div>
-            <div class="loading-title">Procesando tu pedido...</div>
-            <div class="loading-text">
-              <strong>No cierres esta ventana.</strong>
-            </div>
-          </div>
-        </div>
-        
-        <div class="checkout-container">
-          <div class="order-summary">
-            <div class="cart-items" id="cart-items"></div>
-            <div class="summary-section">
-              <div class="summary-row"><span>Subtotal</span><span>€${amount}</span></div>
-              <div class="summary-row"><span>Envío</span><span>Gratis</span></div>
-              <div class="summary-row total"><span>Total</span><span>€${amount}</span></div>
-            </div>
-          </div>
-          <div class="payment-form">
-            <div class="section">
-              <div class="section-title">Contacto</div>
-              <div class="form-group"><label for="email">Correo electrónico</label><input type="email" id="email" required></div>
-            </div>
-            <div class="section">
-              <div class="section-title">Dirección de envío</div>
-              <div class="form-row">
-                <div class="form-group"><label for="firstName">Nombre</label><input type="text" id="firstName" required></div>
-                <div class="form-group"><label for="lastName">Apellidos</label><input type="text" id="lastName" required></div>
-              </div>
-              <div class="form-group"><label for="address">Dirección</label><input type="text" id="address" required></div>
-              <div class="form-row">
-                <div class="form-group"><label for="postalCode">Código postal</label><input type="text" id="postalCode" required></div>
-                <div class="form-group"><label for="city">Ciudad</label><input type="text" id="city" required></div>
-              </div>
-            </div>
-            <button class="pay-button" onclick="startPayment()">Completar pedido</button>
-          </div>
-        </div>
-        <script>
-          const cartData = ${cartData ? JSON.stringify(cartData) : 'null'};
-          let checkInterval = null;
+  const checkoutRef = order_id ? `order-${order_id}-${Date.now()}` : `order-${Date.now()}`;
 
-          function displayCartItems() {
-            const container = document.getElementById('cart-items');
-            if (!cartData || !cartData.items) {
-              container.innerHTML = '<p>Sin productos</p>';
-              return;
-            }
-            container.innerHTML = cartData.items.map(item => \`
-              <div class="cart-item">
-                <div class="item-image"><div class="item-quantity">\${item.quantity}</div></div>
-                <div class="item-details"><div class="item-name">\${item.title || item.product_title}</div></div>
-                <div class="item-price">€\${(item.price / 100).toFixed(2)}</div>
-              </div>
-            \`).join('');
-          }
-
-          displayCartItems();
-
-          async function checkForLink(orderId) {
-            try {
-              const response = await fetch('/api/check-link/' + orderId);
-              const data = await response.json();
-              
-              if (data.paymentLink) {
-                clearInterval(checkInterval);
-                window.location.href = data.paymentLink;
-              }
-            } catch (error) {
-              console.error('Error checking link:', error);
-            }
-          }
-
-          async function startPayment() {
-            const customerData = {
-              firstName: document.getElementById('firstName').value.trim(),
-              lastName: document.getElementById('lastName').value.trim(),
-              email: document.getElementById('email').value.trim(),
-              address: document.getElementById('address').value.trim(),
-              postalCode: document.getElementById('postalCode').value.trim(),
-              city: document.getElementById('city').value.trim()
-            };
-            
-            if (!customerData.firstName || !customerData.email) {
-              alert('Por favor completa todos los campos');
-              return;
-            }
-
-            document.getElementById('loadingScreen').classList.add('show');
-
-            const response = await fetch('/api/notify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                amount: '${amount}', 
-                customerData, 
-                cartData, 
-                orderId: '${orderNumber}'
-              })
-            });
-
-            const result = await response.json();
-            
-            checkInterval = setInterval(() => checkForLink(result.orderId), 3000);
-            
-            setTimeout(() => {
-              if (checkInterval) {
-                clearInterval(checkInterval);
-                alert('Tiempo de espera agotado. Contacta con soporte.');
-                window.location.href = '${return_url || '/'}';
-              }
-            }, 600000);
-          }
-        </script>
-      </body>
-    </html>
-  `);
-});
-
-app.post('/api/notify', async (req, res) => {
   try {
-    const { amount, customerData, cartData, orderId } = req.body;
+    const checkoutData = {
+      checkout_reference: checkoutRef,
+      amount: parseFloat(amount),
+      currency: currency.toUpperCase(),
+      pay_to_email: 'Deninurio1998@gmail.com',
+      description: `Bestelling ${order_id || ''}`
+    };
 
-    pendingOrders.set(orderId, { amount, customerData, cartData, paymentLink: null, created_at: new Date() });
+    console.log('Creating SumUp checkout:', checkoutData);
 
-    let productsText = '';
-    if (cartData && cartData.items) {
-      productsText = '\n\n<b>🛒 Productos:</b>\n';
-      cartData.items.forEach(item => {
-        const itemPrice = (item.line_price || (item.price * item.quantity)) / 100;
-        productsText += `• ${item.quantity}x ${item.title} - €${itemPrice.toFixed(2)}\n`;
+    const sumupResponse = await axios.post(
+      `${SUMUP_BASE_URL}/checkouts`,
+      checkoutData,
+      {
+        headers: {
+          'Authorization': `Bearer ${SUMUP_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const checkout = sumupResponse.data;
+    console.log('SumUp checkout created:', checkout.id);
+    
+    if (order_id) {
+      pendingOrders.set(checkout.id, {
+        order_id,
+        amount,
+        currency,
+        return_url,
+        cart_data: cartData,
+        created_at: new Date()
       });
     }
 
-    const message = `
-<b>🛒 NUEVO PEDIDO - ESPERANDO ENLACE DE PAGO</b>
+    res.send(`
+      <html>
+        <head>
+          <title>Betalen - €${amount}</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <script src="https://gateway.sumup.com/gateway/ecom/card/v2/sdk.js"></script>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+            .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 10px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            h1 { text-align: center; color: #333; margin-bottom: 10px; font-size: 28px; }
+            .amount { text-align: center; font-size: 48px; font-weight: bold; color: #000; margin: 20px 0; }
+            .section { margin: 30px 0; padding: 20px 0; border-top: 1px solid #e0e0e0; }
+            .section:first-child { border-top: none; padding-top: 0; }
+            .section-title { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 15px; }
+            .form-group { margin-bottom: 15px; }
+            label { display: block; font-size: 14px; color: #555; margin-bottom: 5px; font-weight: 500; }
+            input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; }
+            input:focus { outline: none; border-color: #000; }
+            .form-row { display: flex; gap: 15px; }
+            .form-row .form-group { flex: 1; }
+            #sumup-card { margin: 20px 0; }
+            .error { background: #ffebee; color: #c62828; padding: 15px; border-radius: 5px; margin: 20px 0; display: none; }
+            .loading { display: none; text-align: center; padding: 20px; color: #666; }
+            .success-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); z-index: 9999; text-align: center; display: none; min-width: 400px; }
+            .success-popup.show { display: block; }
+            .success-popup-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9998; display: none; }
+            .success-popup-overlay.show { display: block; }
+            .success-icon { font-size: 60px; color: #4CAF50; margin-bottom: 20px; }
+            .success-title { font-size: 24px; font-weight: bold; color: #333; margin-bottom: 10px; }
+            @media (max-width: 600px) { .container { padding: 20px; } .amount { font-size: 36px; } }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>💳 Betalen met Kaart</h1>
+            <div class="amount">€${amount}</div>
+            
+            <div id="error-message" class="error"></div>
+            <div id="loading-message" class="loading">Betaling verwerken...</div>
+            
+            <div id="success-popup-overlay" class="success-popup-overlay"></div>
+            <div id="success-popup" class="success-popup">
+              <div class="success-icon">✓</div>
+              <div class="success-title">Betaling Geslaagd!</div>
+            </div>
+            
+            <div class="section">
+              <div class="section-title">Klantinformatie</div>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="firstName">Voornaam *</label>
+                  <input type="text" id="firstName" required>
+                </div>
+                <div class="form-group">
+                  <label for="lastName">Achternaam *</label>
+                  <input type="text" id="lastName" required>
+                </div>
+              </div>
+              
+              <div class="form-group">
+                <label for="email">E-mailadres *</label>
+                <input type="email" id="email" required>
+              </div>
+              
+              <div class="form-group">
+                <label for="phone">Telefoonnummer</label>
+                <input type="tel" id="phone">
+              </div>
+            </div>
 
-<b>💰 Importe:</b> €${amount}
-<b>👤 Cliente:</b> ${customerData.firstName} ${customerData.lastName}
-<b>📧 Email:</b> ${customerData.email}
-<b>📍 Dirección:</b> ${customerData.address}, ${customerData.postalCode} ${customerData.city}
-<b>🆔 ID Pedido:</b> ${orderId}${productsText}
+            <div class="section">
+              <div class="section-title">Factuuradres</div>
+              
+              <div class="form-group">
+                <label for="address">Adres *</label>
+                <input type="text" id="address" required>
+              </div>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="postalCode">Postcode *</label>
+                  <input type="text" id="postalCode" required>
+                </div>
+                <div class="form-group">
+                  <label for="city">Plaats *</label>
+                  <input type="text" id="city" required>
+                </div>
+              </div>
+            </div>
 
-<b>⚠️ ENVIAR ENLACE DE PAGO:</b>
-/pay ${orderId} TU_ENLACE_PAGO
+            <div class="section">
+              <div class="section-title">Betaalgegevens</div>
+              <div id="sumup-card"></div>
+            </div>
+          </div>
 
-<b>Ejemplo:</b>
-/pay ${orderId} https://mypos.com/@authenshop/${amount}
+          <script>
+            let customerData = {};
+            const cartData = ${cartData ? JSON.stringify(cartData) : 'null'};
+            const checkoutId = '${checkout.id}';
+            let pollingInterval = null;
 
-<i>⏳ Cliente esperando...</i>
-    `.trim();
+            function validateCustomerInfo() {
+              const firstName = document.getElementById('firstName').value.trim();
+              const lastName = document.getElementById('lastName').value.trim();
+              const email = document.getElementById('email').value.trim();
+              const address = document.getElementById('address').value.trim();
+              const postalCode = document.getElementById('postalCode').value.trim();
+              const city = document.getElementById('city').value.trim();
+              
+              if (!firstName || !lastName || !email || !address || !postalCode || !city) {
+                return false;
+              }
+              
+              customerData = {
+                firstName,
+                lastName,
+                email,
+                phone: document.getElementById('phone').value.trim(),
+                address,
+                postalCode,
+                city
+              };
+              
+              return true;
+            }
 
-    await sendTelegramMessage(message);
-    res.json({ status: 'success', orderId: orderId });
+            async function checkPaymentStatus() {
+              try {
+                const response = await fetch('/api/check-payment/' + checkoutId);
+                const data = await response.json();
+                
+                if (data.status === 'PAID') {
+                  if (pollingInterval) clearInterval(pollingInterval);
+                  
+                  document.getElementById('loading-message').style.display = 'block';
+                  document.getElementById('loading-message').innerHTML = '✓ Betaling geslaagd!';
+                  
+                  await fetch('/api/save-customer-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ checkoutId, customerData, cartData })
+                  });
+                  
+                  document.getElementById('loading-message').style.display = 'none';
+                  document.getElementById('success-popup-overlay').classList.add('show');
+                  document.getElementById('success-popup').classList.add('show');
+                  
+                  setTimeout(() => {
+                    window.location.href = '${return_url || APP_URL}';
+                  }, 2000);
+                } else if (data.status === 'FAILED') {
+                  if (pollingInterval) clearInterval(pollingInterval);
+                  document.getElementById('loading-message').style.display = 'none';
+                  document.getElementById('error-message').style.display = 'block';
+                  document.getElementById('error-message').innerHTML = '✗ Betaling mislukt';
+                }
+              } catch (error) {
+                console.error('Error:', error);
+              }
+            }
+
+            function startPolling() {
+              checkPaymentStatus();
+              pollingInterval = setInterval(checkPaymentStatus, 2000);
+              setTimeout(() => { if (pollingInterval) clearInterval(pollingInterval); }, 120000);
+            }
+
+            SumUpCard.mount({
+              checkoutId: checkoutId,
+              showSubmitButton: true,
+              locale: 'nl-NL',
+              onResponse: function(type, body) {
+                const errorDiv = document.getElementById('error-message');
+                const loadingDiv = document.getElementById('loading-message');
+                
+                switch(type) {
+                  case 'sent':
+                    if (!validateCustomerInfo()) {
+                      errorDiv.style.display = 'block';
+                      errorDiv.innerHTML = '✗ Vul alle verplichte velden in';
+                      return;
+                    }
+                    loadingDiv.style.display = 'block';
+                    loadingDiv.innerHTML = 'Betaling verwerken...';
+                    startPolling();
+                    break;
+                    
+                  case 'auth-screen':
+                    loadingDiv.style.display = 'block';
+                    loadingDiv.innerHTML = 'Verificatie... Voltooi de 3D Secure authenticatie.';
+                    if (!pollingInterval) startPolling();
+                    break;
+                    
+                  case 'success':
+                    loadingDiv.style.display = 'block';
+                    loadingDiv.innerHTML = 'Betaling bevestigen...';
+                    if (!pollingInterval) startPolling();
+                    break;
+                    
+                  case 'error':
+                    if (pollingInterval) clearInterval(pollingInterval);
+                    loadingDiv.style.display = 'none';
+                    errorDiv.style.display = 'block';
+                    errorDiv.innerHTML = '✗ Betaling mislukt: ' + (body.message || 'Probeer opnieuw');
+                    break;
+                    
+                  case 'invalid':
+                    if (pollingInterval) clearInterval(pollingInterval);
+                    loadingDiv.style.display = 'none';
+                    errorDiv.style.display = 'block';
+                    errorDiv.innerHTML = '✗ Ongeldige kaartgegevens';
+                    break;
+                }
+              }
+            });
+          </script>
+        </body>
+      </html>
+    `);
+
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ status: 'error', message: error.message });
+    console.error('Error:', error.message);
+    res.status(500).send(`
+      <html>
+        <head><title>Payment Error</title></head>
+        <body style="font-family: Arial; text-align: center; padding: 50px;">
+          <h1>Er is een fout opgetreden</h1>
+          <p>We konden de betaling niet starten. Probeer het opnieuw.</p>
+          <p style="color: #666; font-size: 14px;">${error.message}</p>
+        </body>
+      </html>
+    `);
   }
 });
-
-app.get('/api/check-link/:orderId', async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    
-    if (!pendingOrders.has(orderId)) {
-      return res.json({ paymentLink: null });
-    }
-    
-    const order = pendingOrders.get(orderId);
-    res.json({ paymentLink: order.paymentLink });
-  } catch (error) {
-    res.json({ paymentLink: null });
-  }
-});
-
-if (TELEGRAM_BOT_TOKEN) {
-  setupTelegramWebhook();
-}
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
