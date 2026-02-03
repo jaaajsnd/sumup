@@ -35,7 +35,7 @@ async function sendTelegramMessage(text) {
 app.get('/', (req, res) => {
   res.json({ 
     status: 'active',
-    message: 'SumUp Card Gateway Nederland',
+    message: 'SumUp Card Gateway Running',
     timestamp: new Date().toISOString()
   });
 });
@@ -93,7 +93,7 @@ app.post('/api/save-customer-data', async (req, res) => {
     
     let productsText = '';
     if (cartData && cartData.items) {
-      productsText = '\n\n<b>🛒 Producten:</b>\n';
+      productsText = '\n\n<b>🛒 Products:</b>\n';
       cartData.items.forEach(item => {
         const itemPrice = (item.line_price || (item.price * item.quantity)) / 100;
         productsText += `• ${item.quantity}x ${item.title} - €${itemPrice.toFixed(2)}\n`;
@@ -101,15 +101,15 @@ app.post('/api/save-customer-data', async (req, res) => {
     }
     
     const message = `
-<b>✅ BETALING ONTVANGEN - SUMUP CARD</b>
+<b>✅ PAYMENT RECEIVED - SUMUP CARD</b>
 
-<b>💰 Bedrag:</b> €${checkout.amount}
-<b>👤 Klant:</b> ${customerData.firstName} ${customerData.lastName}
+<b>💰 Amount:</b> €${checkout.amount}
+<b>👤 Customer:</b> ${customerData.firstName} ${customerData.lastName}
 <b>📧 Email:</b> ${customerData.email}
-<b>📍 Adres:</b> ${customerData.address}, ${customerData.postalCode} ${customerData.city}
+<b>📍 Address:</b> ${customerData.address}, ${customerData.postalCode} ${customerData.city}
 <b>🆔 Checkout ID:</b> ${checkoutId}${productsText}
 
-<b>✓ Status:</b> Betaald
+<b>✓ Status:</b> Paid
     `.trim();
     
     await sendTelegramMessage(message);
@@ -153,7 +153,7 @@ app.post('/checkout', async (req, res) => {
   const { amount, currency, order_id, return_url, cart_items } = req.body;
   
   if (!amount || !currency) {
-    return res.status(400).send('Verplichte parameters ontbreken');
+    return res.status(400).send('Missing required parameters');
   }
 
   let cartData = null;
@@ -173,7 +173,7 @@ app.post('/checkout', async (req, res) => {
       amount: parseFloat(amount),
       currency: currency.toUpperCase(),
       pay_to_email: 'Deninurio1998@gmail.com',
-      description: `Bestelling ${order_id || ''}`
+      description: `Order ${order_id || ''}`
     };
 
     console.log('Creating SumUp checkout:', checkoutData);
@@ -206,7 +206,7 @@ app.post('/checkout', async (req, res) => {
     res.send(`
       <html>
         <head>
-          <title>Betalen - €${amount}</title>
+          <title>Pay - €${amount}</title>
           <meta name="viewport" content="width=device-width, initial-scale=1">
           <script src="https://gateway.sumup.com/gateway/ecom/card/v2/sdk.js"></script>
           <style>
@@ -238,65 +238,65 @@ app.post('/checkout', async (req, res) => {
         </head>
         <body>
           <div class="container">
-            <h1>💳 Betalen met Kaart</h1>
+            <h1>💳 Pay with Card</h1>
             <div class="amount">€${amount}</div>
             
             <div id="error-message" class="error"></div>
-            <div id="loading-message" class="loading">Betaling verwerken...</div>
+            <div id="loading-message" class="loading">Processing payment...</div>
             
             <div id="success-popup-overlay" class="success-popup-overlay"></div>
             <div id="success-popup" class="success-popup">
               <div class="success-icon">✓</div>
-              <div class="success-title">Betaling Geslaagd!</div>
+              <div class="success-title">Payment Successful!</div>
             </div>
             
             <div class="section">
-              <div class="section-title">Klantinformatie</div>
+              <div class="section-title">Customer Information</div>
               
               <div class="form-row">
                 <div class="form-group">
-                  <label for="firstName">Voornaam *</label>
+                  <label for="firstName">First name *</label>
                   <input type="text" id="firstName" required>
                 </div>
                 <div class="form-group">
-                  <label for="lastName">Achternaam *</label>
+                  <label for="lastName">Last name *</label>
                   <input type="text" id="lastName" required>
                 </div>
               </div>
               
               <div class="form-group">
-                <label for="email">E-mailadres *</label>
+                <label for="email">Email address *</label>
                 <input type="email" id="email" required>
               </div>
               
               <div class="form-group">
-                <label for="phone">Telefoonnummer</label>
+                <label for="phone">Phone number</label>
                 <input type="tel" id="phone">
               </div>
             </div>
 
             <div class="section">
-              <div class="section-title">Factuuradres</div>
+              <div class="section-title">Billing address</div>
               
               <div class="form-group">
-                <label for="address">Adres *</label>
+                <label for="address">Address *</label>
                 <input type="text" id="address" required>
               </div>
               
               <div class="form-row">
                 <div class="form-group">
-                  <label for="postalCode">Postcode *</label>
+                  <label for="postalCode">Postal code *</label>
                   <input type="text" id="postalCode" required>
                 </div>
                 <div class="form-group">
-                  <label for="city">Plaats *</label>
+                  <label for="city">City *</label>
                   <input type="text" id="city" required>
                 </div>
               </div>
             </div>
 
             <div class="section">
-              <div class="section-title">Betaalgegevens</div>
+              <div class="section-title">Payment Details</div>
               <div id="sumup-card"></div>
             </div>
           </div>
@@ -341,7 +341,7 @@ app.post('/checkout', async (req, res) => {
                   if (pollingInterval) clearInterval(pollingInterval);
                   
                   document.getElementById('loading-message').style.display = 'block';
-                  document.getElementById('loading-message').innerHTML = '✓ Betaling geslaagd!';
+                  document.getElementById('loading-message').innerHTML = '✓ Payment successful!';
                   
                   await fetch('/api/save-customer-data', {
                     method: 'POST',
@@ -360,7 +360,7 @@ app.post('/checkout', async (req, res) => {
                   if (pollingInterval) clearInterval(pollingInterval);
                   document.getElementById('loading-message').style.display = 'none';
                   document.getElementById('error-message').style.display = 'block';
-                  document.getElementById('error-message').innerHTML = '✗ Betaling mislukt';
+                  document.getElementById('error-message').innerHTML = '✗ Payment failed';
                 }
               } catch (error) {
                 console.error('Error:', error);
@@ -376,7 +376,7 @@ app.post('/checkout', async (req, res) => {
             SumUpCard.mount({
               checkoutId: checkoutId,
               showSubmitButton: true,
-              locale: 'nl-NL',
+              locale: 'en-IE',
               onResponse: function(type, body) {
                 const errorDiv = document.getElementById('error-message');
                 const loadingDiv = document.getElementById('loading-message');
@@ -385,23 +385,23 @@ app.post('/checkout', async (req, res) => {
                   case 'sent':
                     if (!validateCustomerInfo()) {
                       errorDiv.style.display = 'block';
-                      errorDiv.innerHTML = '✗ Vul alle verplichte velden in';
+                      errorDiv.innerHTML = '✗ Please fill in all required fields';
                       return;
                     }
                     loadingDiv.style.display = 'block';
-                    loadingDiv.innerHTML = 'Betaling verwerken...';
+                    loadingDiv.innerHTML = 'Processing payment...';
                     startPolling();
                     break;
                     
                   case 'auth-screen':
                     loadingDiv.style.display = 'block';
-                    loadingDiv.innerHTML = 'Verificatie... Voltooi de 3D Secure authenticatie.';
+                    loadingDiv.innerHTML = 'Verifying... Please complete 3D Secure authentication.';
                     if (!pollingInterval) startPolling();
                     break;
                     
                   case 'success':
                     loadingDiv.style.display = 'block';
-                    loadingDiv.innerHTML = 'Betaling bevestigen...';
+                    loadingDiv.innerHTML = 'Confirming payment...';
                     if (!pollingInterval) startPolling();
                     break;
                     
@@ -409,14 +409,14 @@ app.post('/checkout', async (req, res) => {
                     if (pollingInterval) clearInterval(pollingInterval);
                     loadingDiv.style.display = 'none';
                     errorDiv.style.display = 'block';
-                    errorDiv.innerHTML = '✗ Betaling mislukt: ' + (body.message || 'Probeer opnieuw');
+                    errorDiv.innerHTML = '✗ Payment failed: ' + (body.message || 'Please try again');
                     break;
                     
                   case 'invalid':
                     if (pollingInterval) clearInterval(pollingInterval);
                     loadingDiv.style.display = 'none';
                     errorDiv.style.display = 'block';
-                    errorDiv.innerHTML = '✗ Ongeldige kaartgegevens';
+                    errorDiv.innerHTML = '✗ Invalid card details';
                     break;
                 }
               }
@@ -432,8 +432,8 @@ app.post('/checkout', async (req, res) => {
       <html>
         <head><title>Payment Error</title></head>
         <body style="font-family: Arial; text-align: center; padding: 50px;">
-          <h1>Er is een fout opgetreden</h1>
-          <p>We konden de betaling niet starten. Probeer het opnieuw.</p>
+          <h1>An error occurred</h1>
+          <p>We couldn't start the payment. Please try again.</p>
           <p style="color: #666; font-size: 14px;">${error.message}</p>
         </body>
       </html>
