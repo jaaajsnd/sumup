@@ -21,7 +21,7 @@ const pendingOrders = new Map();
 
 const translations = {
   nl: {
-    title: 'Checkout',
+    title: 'Betalen met Kaart',
     customer_info: 'Klantinformatie',
     first_name: 'Voornaam',
     last_name: 'Achternaam',
@@ -44,7 +44,7 @@ const translations = {
     locale: 'nl-NL'
   },
   es: {
-    title: 'Pagar',
+    title: 'Pagar con Tarjeta',
     customer_info: 'Información del Cliente',
     first_name: 'Nombre',
     last_name: 'Apellidos',
@@ -66,8 +66,31 @@ const translations = {
     error_text: 'No pudimos iniciar el pago. Por favor intenta de nuevo.',
     locale: 'es-ES'
   },
+  fr: {
+    title: 'Payer par Carte',
+    customer_info: 'Informations Client',
+    first_name: 'Prénom',
+    last_name: 'Nom',
+    email: 'Adresse e-mail',
+    phone: 'Numéro de téléphone',
+    billing_address: 'Adresse de facturation',
+    address: 'Adresse',
+    postal_code: 'Code postal',
+    city: 'Ville',
+    payment_details: 'Détails de Paiement',
+    processing: 'Traitement du paiement...',
+    fill_fields: 'Veuillez remplir tous les champs obligatoires',
+    verifying: 'Vérification... Veuillez compléter l\'authentification 3D Secure.',
+    confirming: 'Confirmation du paiement...',
+    failed: 'Paiement échoué',
+    invalid: 'Détails de carte invalides',
+    success_title: 'Paiement Réussi!',
+    error_title: 'Une erreur s\'est produite',
+    error_text: 'Nous n\'avons pas pu démarrer le paiement. Veuillez réessayer.',
+    locale: 'fr-FR'
+  },
   en: {
-    title: 'Checkout',
+    title: 'Pay with Card',
     customer_info: 'Customer Information',
     first_name: 'First name',
     last_name: 'Last name',
@@ -98,6 +121,7 @@ async function getLanguageFromIP(ip) {
     
     if (country === 'NL' || country === 'BE') return 'nl';
     if (country === 'ES') return 'es';
+    if (country === 'FR') return 'fr';
     return 'en';
   } catch (error) {
     return 'en';
