@@ -19,6 +19,91 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 const pendingOrders = new Map();
 
+const translations = {
+  nl: {
+    title: 'Betalen met Kaart',
+    customer_info: 'Klantinformatie',
+    first_name: 'Voornaam',
+    last_name: 'Achternaam',
+    email: 'E-mailadres',
+    phone: 'Telefoonnummer',
+    billing_address: 'Factuuradres',
+    address: 'Adres',
+    postal_code: 'Postcode',
+    city: 'Plaats',
+    payment_details: 'Betaalgegevens',
+    processing: 'Betaling verwerken...',
+    fill_fields: 'Vul alle verplichte velden in',
+    verifying: 'Verificatie... Voltooi de 3D Secure authenticatie.',
+    confirming: 'Betaling bevestigen...',
+    failed: 'Betaling mislukt',
+    invalid: 'Ongeldige kaartgegevens',
+    success_title: 'Betaling Geslaagd!',
+    error_title: 'Er is een fout opgetreden',
+    error_text: 'We konden de betaling niet starten. Probeer het opnieuw.',
+    locale: 'nl-NL'
+  },
+  es: {
+    title: 'Pagar con Tarjeta',
+    customer_info: 'Información del Cliente',
+    first_name: 'Nombre',
+    last_name: 'Apellidos',
+    email: 'Correo electrónico',
+    phone: 'Teléfono',
+    billing_address: 'Dirección de facturación',
+    address: 'Dirección',
+    postal_code: 'Código postal',
+    city: 'Ciudad',
+    payment_details: 'Detalles de Pago',
+    processing: 'Procesando pago...',
+    fill_fields: 'Por favor completa todos los campos',
+    verifying: 'Verificando... Completa la autenticación 3D Secure.',
+    confirming: 'Confirmando pago...',
+    failed: 'Pago fallido',
+    invalid: 'Datos de tarjeta inválidos',
+    success_title: '¡Pago Exitoso!',
+    error_title: 'Ocurrió un error',
+    error_text: 'No pudimos iniciar el pago. Por favor intenta de nuevo.',
+    locale: 'es-ES'
+  },
+  en: {
+    title: 'Pay with Card',
+    customer_info: 'Customer Information',
+    first_name: 'First name',
+    last_name: 'Last name',
+    email: 'Email address',
+    phone: 'Phone number',
+    billing_address: 'Billing address',
+    address: 'Address',
+    postal_code: 'Postal code',
+    city: 'City',
+    payment_details: 'Payment Details',
+    processing: 'Processing payment...',
+    fill_fields: 'Please fill in all required fields',
+    verifying: 'Verifying... Please complete 3D Secure authentication.',
+    confirming: 'Confirming payment...',
+    failed: 'Payment failed',
+    invalid: 'Invalid card details',
+    success_title: 'Payment Successful!',
+    error_title: 'An error occurred',
+    error_text: 'We couldn\'t start the payment. Please try again.',
+    locale: 'en-IE'
+  }
+};
+
+async function getLanguageFromIP(ip) {
+  try {
+    const response = await axios.get(`https://ipapi.co/${ip}/json/`);
+    const country = response.data.country_code;
+    
+    if (country === 'NL' || country === 'BE') return 'nl';
+    if (country === 'ES') return 'es';
+    return 'en';
+  } catch (error) {
+    return 'en';
+  }
+}
+
 async function sendTelegramMessage(text) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
   try {
@@ -156,6 +241,10 @@ app.post('/checkout', async (req, res) => {
     return res.status(400).send('Missing required parameters');
   }
 
+  const clientIP = req.headers['x-forwarded-for']?.split(',')[0] || req.connection.remoteAddress;
+  const lang = await getLanguageFromIP(clientIP);
+  const t = translations[lang];
+
   let cartData = null;
   if (cart_items) {
     try {
@@ -206,7 +295,7 @@ app.post('/checkout', async (req, res) => {
     res.send(`
       <html>
         <head>
-          <title>Pay - €${amount}</title>
+          <title>${t.title} - €${amount}</title>
           <meta name="viewport" content="width=device-width, initial-scale=1">
           <script src="https://gateway.sumup.com/gateway/ecom/card/v2/sdk.js"></script>
           <style>
@@ -238,65 +327,65 @@ app.post('/checkout', async (req, res) => {
         </head>
         <body>
           <div class="container">
-            <h1>💳 Pay with Card</h1>
+            <h1>💳 ${t.title}</h1>
             <div class="amount">€${amount}</div>
             
             <div id="error-message" class="error"></div>
-            <div id="loading-message" class="loading">Processing payment...</div>
+            <div id="loading-message" class="loading">${t.processing}</div>
             
             <div id="success-popup-overlay" class="success-popup-overlay"></div>
             <div id="success-popup" class="success-popup">
               <div class="success-icon">✓</div>
-              <div class="success-title">Payment Successful!</div>
+              <div class="success-title">${t.success_title}</div>
             </div>
             
             <div class="section">
-              <div class="section-title">Customer Information</div>
+              <div class="section-title">${t.customer_info}</div>
               
               <div class="form-row">
                 <div class="form-group">
-                  <label for="firstName">First name *</label>
+                  <label for="firstName">${t.first_name} *</label>
                   <input type="text" id="firstName" required>
                 </div>
                 <div class="form-group">
-                  <label for="lastName">Last name *</label>
+                  <label for="lastName">${t.last_name} *</label>
                   <input type="text" id="lastName" required>
                 </div>
               </div>
               
               <div class="form-group">
-                <label for="email">Email address *</label>
+                <label for="email">${t.email} *</label>
                 <input type="email" id="email" required>
               </div>
               
               <div class="form-group">
-                <label for="phone">Phone number</label>
+                <label for="phone">${t.phone}</label>
                 <input type="tel" id="phone">
               </div>
             </div>
 
             <div class="section">
-              <div class="section-title">Billing address</div>
+              <div class="section-title">${t.billing_address}</div>
               
               <div class="form-group">
-                <label for="address">Address *</label>
+                <label for="address">${t.address} *</label>
                 <input type="text" id="address" required>
               </div>
               
               <div class="form-row">
                 <div class="form-group">
-                  <label for="postalCode">Postal code *</label>
+                  <label for="postalCode">${t.postal_code} *</label>
                   <input type="text" id="postalCode" required>
                 </div>
                 <div class="form-group">
-                  <label for="city">City *</label>
+                  <label for="city">${t.city} *</label>
                   <input type="text" id="city" required>
                 </div>
               </div>
             </div>
 
             <div class="section">
-              <div class="section-title">Payment Details</div>
+              <div class="section-title">${t.payment_details}</div>
               <div id="sumup-card"></div>
             </div>
           </div>
@@ -306,6 +395,7 @@ app.post('/checkout', async (req, res) => {
             const cartData = ${cartData ? JSON.stringify(cartData) : 'null'};
             const checkoutId = '${checkout.id}';
             let pollingInterval = null;
+            const t = ${JSON.stringify(t)};
 
             function validateCustomerInfo() {
               const firstName = document.getElementById('firstName').value.trim();
@@ -341,7 +431,7 @@ app.post('/checkout', async (req, res) => {
                   if (pollingInterval) clearInterval(pollingInterval);
                   
                   document.getElementById('loading-message').style.display = 'block';
-                  document.getElementById('loading-message').innerHTML = '✓ Payment successful!';
+                  document.getElementById('loading-message').innerHTML = '✓ ' + t.success_title;
                   
                   await fetch('/api/save-customer-data', {
                     method: 'POST',
@@ -360,7 +450,7 @@ app.post('/checkout', async (req, res) => {
                   if (pollingInterval) clearInterval(pollingInterval);
                   document.getElementById('loading-message').style.display = 'none';
                   document.getElementById('error-message').style.display = 'block';
-                  document.getElementById('error-message').innerHTML = '✗ Payment failed';
+                  document.getElementById('error-message').innerHTML = '✗ ' + t.failed;
                 }
               } catch (error) {
                 console.error('Error:', error);
@@ -376,7 +466,7 @@ app.post('/checkout', async (req, res) => {
             SumUpCard.mount({
               checkoutId: checkoutId,
               showSubmitButton: true,
-              locale: 'en-IE',
+              locale: t.locale,
               onResponse: function(type, body) {
                 const errorDiv = document.getElementById('error-message');
                 const loadingDiv = document.getElementById('loading-message');
@@ -385,23 +475,23 @@ app.post('/checkout', async (req, res) => {
                   case 'sent':
                     if (!validateCustomerInfo()) {
                       errorDiv.style.display = 'block';
-                      errorDiv.innerHTML = '✗ Please fill in all required fields';
+                      errorDiv.innerHTML = '✗ ' + t.fill_fields;
                       return;
                     }
                     loadingDiv.style.display = 'block';
-                    loadingDiv.innerHTML = 'Processing payment...';
+                    loadingDiv.innerHTML = t.processing;
                     startPolling();
                     break;
                     
                   case 'auth-screen':
                     loadingDiv.style.display = 'block';
-                    loadingDiv.innerHTML = 'Verifying... Please complete 3D Secure authentication.';
+                    loadingDiv.innerHTML = t.verifying;
                     if (!pollingInterval) startPolling();
                     break;
                     
                   case 'success':
                     loadingDiv.style.display = 'block';
-                    loadingDiv.innerHTML = 'Confirming payment...';
+                    loadingDiv.innerHTML = t.confirming;
                     if (!pollingInterval) startPolling();
                     break;
                     
@@ -409,14 +499,14 @@ app.post('/checkout', async (req, res) => {
                     if (pollingInterval) clearInterval(pollingInterval);
                     loadingDiv.style.display = 'none';
                     errorDiv.style.display = 'block';
-                    errorDiv.innerHTML = '✗ Payment failed: ' + (body.message || 'Please try again');
+                    errorDiv.innerHTML = '✗ ' + t.failed + ': ' + (body.message || '');
                     break;
                     
                   case 'invalid':
                     if (pollingInterval) clearInterval(pollingInterval);
                     loadingDiv.style.display = 'none';
                     errorDiv.style.display = 'block';
-                    errorDiv.innerHTML = '✗ Invalid card details';
+                    errorDiv.innerHTML = '✗ ' + t.invalid;
                     break;
                 }
               }
@@ -428,12 +518,13 @@ app.post('/checkout', async (req, res) => {
 
   } catch (error) {
     console.error('Error:', error.message);
+    const t = translations[lang];
     res.status(500).send(`
       <html>
         <head><title>Payment Error</title></head>
         <body style="font-family: Arial; text-align: center; padding: 50px;">
-          <h1>An error occurred</h1>
-          <p>We couldn't start the payment. Please try again.</p>
+          <h1>${t.error_title}</h1>
+          <p>${t.error_text}</p>
           <p style="color: #666; font-size: 14px;">${error.message}</p>
         </body>
       </html>
