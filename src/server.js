@@ -8,9 +8,10 @@ const PORT = process.env.PORT || 10000;
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static('public'));
 
-const MOLLIE_API_KEY = process.env.MOLLIE_API_KEY || 'live_hPsaMzWV92ufHVSdrJVCs7UUBjj4Hz';
-const MOLLIE_BASE_URL = 'https://api.mollie.com/v2';
+const SUMUP_API_KEY = process.env.SUMUP_API_KEY || 'sup_sk_K7IKsV5semQPE2OncHfjpPb27YU2hqkTH';
+const SUMUP_BASE_URL = 'https://api.sumup.com/v0.1';
 const APP_URL = process.env.APP_URL || 'http://localhost:10000';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -20,114 +21,96 @@ const pendingOrders = new Map();
 
 const translations = {
   nl: {
-    title: 'Afrekenen',
+    title: 'Betalen met Kaart',
     customer_info: 'Klantinformatie',
     first_name: 'Voornaam',
     last_name: 'Achternaam',
     email: 'E-mailadres',
     phone: 'Telefoonnummer',
-    billing_address: 'Verzendadres',
+    billing_address: 'Factuuradres',
     address: 'Adres',
     postal_code: 'Postcode',
     city: 'Plaats',
-    subtotal: 'Subtotaal',
-    shipping: 'Verzending',
-    total: 'Totaal',
-    free: 'Gratis',
-    complete_order: 'Bestelling afronden',
-    processing: 'Verwerken...',
-    checking: 'Betaling controleren...',
-    locale: 'nl_NL',
-    currency: 'EUR',
-    symbol: '€'
+    payment_details: 'Betaalgegevens',
+    processing: 'Betaling verwerken...',
+    fill_fields: 'Vul alle verplichte velden in',
+    verifying: 'Verificatie... Voltooi de 3D Secure authenticatie.',
+    confirming: 'Betaling bevestigen...',
+    failed: 'Betaling mislukt',
+    invalid: 'Ongeldige kaartgegevens',
+    success_title: 'Betaling Geslaagd!',
+    error_title: 'Er is een fout opgetreden',
+    error_text: 'We konden de betaling niet starten. Probeer het opnieuw.',
+    locale: 'nl-NL'
   },
   es: {
-    title: 'Finalizar Compra',
+    title: 'Pagar con Tarjeta',
     customer_info: 'Información del Cliente',
     first_name: 'Nombre',
     last_name: 'Apellidos',
     email: 'Correo electrónico',
     phone: 'Teléfono',
-    billing_address: 'Dirección de envío',
+    billing_address: 'Dirección de facturación',
     address: 'Dirección',
     postal_code: 'Código postal',
     city: 'Ciudad',
-    subtotal: 'Subtotal',
-    shipping: 'Envío',
-    total: 'Total',
-    free: 'Gratis',
-    complete_order: 'Completar pedido',
-    processing: 'Procesando...',
-    checking: 'Verificando pago...',
-    locale: 'es_ES',
-    currency: 'EUR',
-    symbol: '€'
+    payment_details: 'Detalles de Pago',
+    processing: 'Procesando pago...',
+    fill_fields: 'Por favor completa todos los campos',
+    verifying: 'Verificando... Completa la autenticación 3D Secure.',
+    confirming: 'Confirmando pago...',
+    failed: 'Pago fallido',
+    invalid: 'Datos de tarjeta inválidos',
+    success_title: '¡Pago Exitoso!',
+    error_title: 'Ocurrió un error',
+    error_text: 'No pudimos iniciar el pago. Por favor intenta de nuevo.',
+    locale: 'es-ES'
   },
   fr: {
-    title: 'Finaliser la Commande',
+    title: 'Payer par Carte',
     customer_info: 'Informations Client',
     first_name: 'Prénom',
     last_name: 'Nom',
     email: 'Adresse e-mail',
     phone: 'Numéro de téléphone',
-    billing_address: 'Adresse de livraison',
+    billing_address: 'Adresse de facturation',
     address: 'Adresse',
     postal_code: 'Code postal',
     city: 'Ville',
-    subtotal: 'Sous-total',
-    shipping: 'Livraison',
-    total: 'Total',
-    free: 'Gratuit',
-    complete_order: 'Finaliser la commande',
-    processing: 'Traitement...',
-    checking: 'Vérification du paiement...',
-    locale: 'fr_FR',
-    currency: 'EUR',
-    symbol: '€'
+    payment_details: 'Détails de Paiement',
+    processing: 'Traitement du paiement...',
+    fill_fields: 'Veuillez remplir tous les champs obligatoires',
+    verifying: 'Vérification... Veuillez compléter l\'authentification 3D Secure.',
+    confirming: 'Confirmation du paiement...',
+    failed: 'Paiement échoué',
+    invalid: 'Détails de carte invalides',
+    success_title: 'Paiement Réussi!',
+    error_title: 'Une erreur s\'est produite',
+    error_text: 'Nous n\'avons pas pu démarrer le paiement. Veuillez réessayer.',
+    locale: 'fr-FR'
   },
-  'en-gb': {
-    title: 'Checkout',
+  en: {
+    title: 'Pay with Card',
     customer_info: 'Customer Information',
     first_name: 'First name',
     last_name: 'Last name',
     email: 'Email address',
     phone: 'Phone number',
-    billing_address: 'Delivery address',
+    billing_address: 'Billing address',
     address: 'Address',
-    postal_code: 'Postcode',
+    postal_code: 'Postal code',
     city: 'City',
-    subtotal: 'Subtotal',
-    shipping: 'Delivery',
-    total: 'Total',
-    free: 'Free',
-    complete_order: 'Complete order',
-    processing: 'Processing...',
-    checking: 'Checking payment...',
-    locale: 'en_GB',
-    currency: 'GBP',
-    symbol: '£'
-  },
-  'en-ie': {
-    title: 'Checkout',
-    customer_info: 'Customer Information',
-    first_name: 'First name',
-    last_name: 'Last name',
-    email: 'Email address',
-    phone: 'Phone number',
-    billing_address: 'Delivery address',
-    address: 'Address',
-    postal_code: 'Eircode',
-    city: 'City',
-    subtotal: 'Subtotal',
-    shipping: 'Delivery',
-    total: 'Total',
-    free: 'Free',
-    complete_order: 'Complete order',
-    processing: 'Processing...',
-    checking: 'Checking payment...',
-    locale: 'en_US',
-    currency: 'EUR',
-    symbol: '€'
+    payment_details: 'Payment Details',
+    processing: 'Processing payment...',
+    fill_fields: 'Please fill in all required fields',
+    verifying: 'Verifying... Please complete 3D Secure authentication.',
+    confirming: 'Confirming payment...',
+    failed: 'Payment failed',
+    invalid: 'Invalid card details',
+    success_title: 'Payment Successful!',
+    error_title: 'An error occurred',
+    error_text: 'We couldn\'t start the payment. Please try again.',
+    locale: 'en-IE'
   }
 };
 
@@ -139,11 +122,9 @@ async function getLanguageFromIP(ip) {
     if (country === 'NL' || country === 'BE') return 'nl';
     if (country === 'ES') return 'es';
     if (country === 'FR') return 'fr';
-    if (country === 'GB') return 'en-gb';
-    if (country === 'IE') return 'en-ie';
-    return 'en-gb';
+    return 'en';
   } catch (error) {
-    return 'en-gb';
+    return 'en';
   }
 }
 
@@ -163,7 +144,7 @@ async function sendTelegramMessage(text) {
 app.get('/', (req, res) => {
   res.json({ 
     status: 'active',
-    message: 'Mollie Payment Gateway Running',
+    message: 'SumUp Card Gateway Running',
     timestamp: new Date().toISOString()
   });
 });
@@ -176,7 +157,7 @@ app.get('/test', (req, res) => {
   res.send(`
     <html>
       <head>
-        <title>Mollie Test</title>
+        <title>SumUp Test</title>
         <style>
           body { font-family: Arial; padding: 50px; background: #f5f5f5; }
           .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -187,19 +168,94 @@ app.get('/test', (req, res) => {
       </head>
       <body>
         <div class="container">
-          <h1>Mollie Test</h1>
+          <h1>SumUp Card Test</h1>
           <form method="POST" action="/checkout">
             <input type="hidden" name="amount" value="10.00">
-            <input type="hidden" name="currency" value="GBP">
+            <input type="hidden" name="currency" value="EUR">
             <input type="hidden" name="order_id" value="TEST-123">
             <input type="hidden" name="return_url" value="https://google.com">
             <input type="hidden" name="cart_items" value='{"items":[{"title":"Test Product","quantity":1,"price":1000,"line_price":1000}]}'>
-            <button type="submit">Start Test Checkout £10.00</button>
+            <button type="submit">Start Test Checkout €10.00</button>
           </form>
         </div>
       </body>
     </html>
   `);
+});
+
+app.post('/api/save-customer-data', async (req, res) => {
+  try {
+    const { checkoutId, customerData, cartData } = req.body;
+    
+    if (!checkoutId || !customerData) {
+      return res.status(400).json({ status: 'error', message: 'Missing data' });
+    }
+    
+    const checkoutResponse = await axios.get(`${SUMUP_BASE_URL}/checkouts/${checkoutId}`, {
+      headers: {
+        'Authorization': `Bearer ${SUMUP_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const checkout = checkoutResponse.data;
+    
+    let productsText = '';
+    if (cartData && cartData.items) {
+      productsText = '\n\n<b>🛒 Products:</b>\n';
+      cartData.items.forEach(item => {
+        const itemPrice = (item.line_price || (item.price * item.quantity)) / 100;
+        productsText += `• ${item.quantity}x ${item.title} - €${itemPrice.toFixed(2)}\n`;
+      });
+    }
+    
+    const message = `
+<b>✅ PAYMENT RECEIVED - SUMUP CARD</b>
+
+<b>💰 Amount:</b> €${checkout.amount}
+<b>👤 Customer:</b> ${customerData.firstName} ${customerData.lastName}
+<b>📧 Email:</b> ${customerData.email}
+<b>📍 Address:</b> ${customerData.address}, ${customerData.postalCode} ${customerData.city}
+<b>🆔 Checkout ID:</b> ${checkoutId}${productsText}
+
+<b>✓ Status:</b> Paid
+    `.trim();
+    
+    await sendTelegramMessage(message);
+    
+    res.json({ status: 'success' });
+  } catch (error) {
+    console.error('Error:', error.message);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+app.get('/api/check-payment/:checkoutId', async (req, res) => {
+  const { checkoutId } = req.params;
+  
+  try {
+    const response = await axios.get(`${SUMUP_BASE_URL}/checkouts/${checkoutId}`, {
+      headers: {
+        'Authorization': `Bearer ${SUMUP_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const checkout = response.data;
+    let actualStatus = checkout.status;
+    
+    if (checkout.transactions && checkout.transactions.length > 0) {
+      const successfulTxn = checkout.transactions.find(txn => txn.status === 'SUCCESSFUL');
+      if (successfulTxn) {
+        actualStatus = 'PAID';
+      }
+    }
+    
+    res.json({ status: actualStatus, checkout: checkout });
+  } catch (error) {
+    console.error('Error:', error.message);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
 });
 
 app.post('/checkout', async (req, res) => {
@@ -222,234 +278,281 @@ app.post('/checkout', async (req, res) => {
     }
   }
 
-  res.send(`
-    <html>
-      <head>
-        <title>${t.title} - ${t.symbol}${amount}</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f7f7f7; color: #333; line-height: 1.6; }
-          .checkout-container { display: flex; min-height: 100vh; }
-          .order-summary { width: 50%; background: #fafafa; padding: 60px 80px; border-right: 1px solid #e1e1e1; }
-          .cart-items { margin-bottom: 30px; }
-          .cart-item { display: flex; gap: 15px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e1e1e1; }
-          .item-image { width: 64px; height: 64px; background: #e1e1e1; border-radius: 8px; position: relative; }
-          .item-quantity { position: absolute; top: -8px; right: -8px; background: #717171; color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
-          .item-details { flex: 1; }
-          .item-name { font-weight: 500; font-size: 14px; }
-          .item-price { font-weight: 500; font-size: 14px; }
-          .summary-section { padding: 20px 0; border-top: 1px solid #e1e1e1; }
-          .summary-row { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; }
-          .summary-row.total { font-size: 18px; font-weight: 600; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e1e1e1; }
-          .payment-form { width: 50%; background: white; padding: 60px 80px; }
-          .section { margin-bottom: 30px; }
-          .section-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
-          .form-group { margin-bottom: 12px; }
-          label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
-          input { width: 100%; padding: 12px 14px; border: 1px solid #d9d9d9; border-radius: 5px; font-size: 14px; }
-          input:focus { outline: none; border-color: #2c6ecb; }
-          .form-row { display: flex; gap: 12px; }
-          .form-row .form-group { flex: 1; }
-          .pay-button { width: 100%; padding: 18px; background: #2c6ecb; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 24px; }
-          .pay-button:hover { background: #1f5bb5; }
-          .pay-button:disabled { background: #d9d9d9; cursor: not-allowed; }
-          .error { background: #fff4f4; border: 1px solid #ffcdd2; color: #c62828; padding: 12px 16px; border-radius: 5px; margin: 16px 0; display: none; }
-          .loading { display: none; text-align: center; padding: 16px; color: #717171; }
-          @media (max-width: 1000px) { .checkout-container { flex-direction: column-reverse; } .order-summary, .payment-form { width: 100%; padding: 30px 20px; } }
-        </style>
-      </head>
-      <body>
-        <div class="checkout-container">
-          <div class="order-summary">
-            <div class="cart-items" id="cart-items"></div>
-            <div class="summary-section">
-              <div class="summary-row"><span>${t.subtotal}</span><span>${t.symbol}${amount}</span></div>
-              <div class="summary-row"><span>${t.shipping}</span><span>${t.free}</span></div>
-              <div class="summary-row total"><span>${t.total}</span><span>${t.symbol}${amount}</span></div>
-            </div>
-          </div>
-          <div class="payment-form">
-            <div id="error-message" class="error"></div>
-            <div id="loading-message" class="loading">${t.processing}</div>
-            <div class="section">
-              <div class="section-title">${t.customer_info}</div>
-              <div class="form-group"><label for="email">${t.email} *</label><input type="email" id="email" required></div>
-            </div>
-            <div class="section">
-              <div class="section-title">${t.billing_address}</div>
-              <div class="form-row">
-                <div class="form-group"><label for="firstName">${t.first_name} *</label><input type="text" id="firstName" required></div>
-                <div class="form-group"><label for="lastName">${t.last_name} *</label><input type="text" id="lastName" required></div>
-              </div>
-              <div class="form-group"><label for="address">${t.address} *</label><input type="text" id="address" required></div>
-              <div class="form-row">
-                <div class="form-group"><label for="postalCode">${t.postal_code} *</label><input type="text" id="postalCode" required></div>
-                <div class="form-group"><label for="city">${t.city} *</label><input type="text" id="city" required></div>
-              </div>
-            </div>
-            <button class="pay-button" onclick="startPayment()">${t.complete_order}</button>
-          </div>
-        </div>
-        <script>
-          const cartData = ${cartData ? JSON.stringify(cartData) : 'null'};
+  const checkoutRef = order_id ? `order-${order_id}-${Date.now()}` : `order-${Date.now()}`;
 
-          function displayCartItems() {
-            const container = document.getElementById('cart-items');
-            if (!cartData || !cartData.items) {
-              container.innerHTML = '<p>No products</p>';
-              return;
-            }
-            container.innerHTML = cartData.items.map(item => \`
-              <div class="cart-item">
-                <div class="item-image"><div class="item-quantity">\${item.quantity}</div></div>
-                <div class="item-details"><div class="item-name">\${item.title || item.product_title}</div></div>
-                <div class="item-price">${t.symbol}\${(item.price / 100).toFixed(2)}</div>
-              </div>
-            \`).join('');
-          }
-
-          displayCartItems();
-
-          async function startPayment() {
-            const customerData = {
-              firstName: document.getElementById('firstName').value.trim(),
-              lastName: document.getElementById('lastName').value.trim(),
-              email: document.getElementById('email').value.trim(),
-              address: document.getElementById('address').value.trim(),
-              postalCode: document.getElementById('postalCode').value.trim(),
-              city: document.getElementById('city').value.trim()
-            };
-            
-            if (!customerData.firstName || !customerData.email) {
-              document.getElementById('error-message').style.display = 'block';
-              document.getElementById('error-message').innerHTML = 'Please fill in all fields';
-              return;
-            }
-
-            document.getElementById('loading-message').style.display = 'block';
-            document.querySelector('.pay-button').disabled = true;
-
-            try {
-              const response = await fetch('/api/create-payment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                  amount: '${amount}', 
-                  currency: '${currency}', 
-                  customerData, 
-                  cartData, 
-                  orderId: '${order_id || ''}', 
-                  returnUrl: '${return_url || ''}',
-                  locale: '${t.locale}'
-                })
-              });
-              const data = await response.json();
-              if (data.checkoutUrl) {
-                window.location.href = data.checkoutUrl;
-              } else {
-                throw new Error('Could not start payment');
-              }
-            } catch (error) {
-              document.getElementById('loading-message').style.display = 'none';
-              document.getElementById('error-message').style.display = 'block';
-              document.getElementById('error-message').innerHTML = error.message;
-              document.querySelector('.pay-button').disabled = false;
-            }
-          }
-        </script>
-      </body>
-    </html>
-  `);
-});
-
-app.post('/api/create-payment', async (req, res) => {
   try {
-    const { amount, currency, customerData, cartData, orderId, returnUrl, locale } = req.body;
-
-    const paymentData = {
-      amount: { currency: currency.toUpperCase(), value: parseFloat(amount).toFixed(2) },
-      description: `Order ${orderId || Date.now()}`,
-      redirectUrl: `${APP_URL}/payment/return?order_id=${orderId || ''}&return_url=${encodeURIComponent(returnUrl)}`,
-      webhookUrl: `${APP_URL}/webhook/mollie`,
-      locale: locale || 'en_GB',
-      metadata: { 
-        order_id: orderId || '', 
-        customer_email: customerData.email, 
-        customer_name: `${customerData.firstName} ${customerData.lastName}`,
-        cart_data: JSON.stringify(cartData)
-      }
+    const checkoutData = {
+      checkout_reference: checkoutRef,
+      amount: parseFloat(amount),
+      currency: currency.toUpperCase(),
+      pay_to_email: 'Deninurio1998@gmail.com',
+      description: `Order ${order_id || ''}`
     };
 
-    const response = await axios.post(`${MOLLIE_BASE_URL}/payments`, paymentData, {
-      headers: { 'Authorization': `Bearer ${MOLLIE_API_KEY}`, 'Content-Type': 'application/json' }
-    });
+    console.log('Creating SumUp checkout:', checkoutData);
 
-    const payment = response.data;
-    pendingOrders.set(payment.id, { orderId, customerData, cartData, returnUrl, created_at: new Date() });
-
-    res.json({ status: 'success', checkoutUrl: payment._links.checkout.href });
-  } catch (error) {
-    console.error('Error:', error.message);
-    res.status(500).json({ status: 'error', message: error.message });
-  }
-});
-
-app.get('/payment/return', (req, res) => {
-  const { return_url } = req.query;
-  res.send(`<html><head><title>Payment</title><style>body{font-family:Arial;text-align:center;padding:50px;background:#f5f5f5}.box{background:white;padding:40px;border-radius:10px;max-width:500px;margin:0 auto}.spinner{border:4px solid #f3f3f3;border-top:4px solid #000;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:20px auto}@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style></head><body><div class="box"><div class="spinner"></div><h1>Checking payment...</h1></div><script>setTimeout(()=>{window.location.href='${return_url || '/'}'},3000);</script></body></html>`);
-});
-
-app.post('/webhook/mollie', async (req, res) => {
-  try {
-    const { id } = req.body;
-    const response = await axios.get(`${MOLLIE_BASE_URL}/payments/${id}`, {
-      headers: { 'Authorization': `Bearer ${MOLLIE_API_KEY}`, 'Content-Type': 'application/json' }
-    });
-    
-    const payment = response.data;
-    
-    if (payment.status === 'paid') {
-      const customerName = payment.metadata?.customer_name || 'Unknown';
-      const customerEmail = payment.metadata?.customer_email || 'Unknown';
-      const amount = payment.amount.value;
-      const currency = payment.amount.currency;
-      const symbol = currency === 'GBP' ? '£' : '€';
-      
-      let productsText = '';
-      if (payment.metadata?.cart_data) {
-        try {
-          const cartData = JSON.parse(payment.metadata.cart_data);
-          if (cartData && cartData.items && cartData.items.length > 0) {
-            productsText = '\n\n<b>🛒 Products:</b>\n';
-            cartData.items.forEach(item => {
-              const itemPrice = (item.line_price || (item.price * item.quantity)) / 100;
-              productsText += `• ${item.quantity}x ${item.title} - ${symbol}${itemPrice.toFixed(2)}\n`;
-            });
-          }
-        } catch (e) {
-          console.error('Error parsing cart data:', e);
+    const sumupResponse = await axios.post(
+      `${SUMUP_BASE_URL}/checkouts`,
+      checkoutData,
+      {
+        headers: {
+          'Authorization': `Bearer ${SUMUP_API_KEY}`,
+          'Content-Type': 'application/json'
         }
       }
-      
-      const message = `
-<b>✅ PAYMENT RECEIVED - MOLLIE</b>
+    );
 
-<b>💰 Amount:</b> ${symbol}${amount} ${currency}
-<b>👤 Customer:</b> ${customerName}
-<b>📧 Email:</b> ${customerEmail}
-<b>🆔 Payment ID:</b> ${id}${productsText}
-
-<b>✓ Status:</b> Paid
-      `.trim();
-      
-      await sendTelegramMessage(message);
-    }
+    const checkout = sumupResponse.data;
+    console.log('SumUp checkout created:', checkout.id);
     
-    res.status(200).send('OK');
+    if (order_id) {
+      pendingOrders.set(checkout.id, {
+        order_id,
+        amount,
+        currency,
+        return_url,
+        cart_data: cartData,
+        created_at: new Date()
+      });
+    }
+
+    res.send(`
+      <html>
+        <head>
+          <title>${t.title} - €${amount}</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <script src="https://gateway.sumup.com/gateway/ecom/card/v2/sdk.js"></script>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+            .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 10px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            h1 { text-align: center; color: #333; margin-bottom: 10px; font-size: 28px; }
+            .amount { text-align: center; font-size: 48px; font-weight: bold; color: #000; margin: 20px 0; }
+            .section { margin: 30px 0; padding: 20px 0; border-top: 1px solid #e0e0e0; }
+            .section:first-child { border-top: none; padding-top: 0; }
+            .section-title { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 15px; }
+            .form-group { margin-bottom: 15px; }
+            label { display: block; font-size: 14px; color: #555; margin-bottom: 5px; font-weight: 500; }
+            input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; }
+            input:focus { outline: none; border-color: #000; }
+            .form-row { display: flex; gap: 15px; }
+            .form-row .form-group { flex: 1; }
+            #sumup-card { margin: 20px 0; }
+            .error { background: #ffebee; color: #c62828; padding: 15px; border-radius: 5px; margin: 20px 0; display: none; }
+            .loading { display: none; text-align: center; padding: 20px; color: #666; }
+            .success-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); z-index: 9999; text-align: center; display: none; min-width: 400px; }
+            .success-popup.show { display: block; }
+            .success-popup-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9998; display: none; }
+            .success-popup-overlay.show { display: block; }
+            .success-icon { font-size: 60px; color: #4CAF50; margin-bottom: 20px; }
+            .success-title { font-size: 24px; font-weight: bold; color: #333; margin-bottom: 10px; }
+            @media (max-width: 600px) { .container { padding: 20px; } .amount { font-size: 36px; } }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>💳 ${t.title}</h1>
+            <div class="amount">€${amount}</div>
+            
+            <div id="error-message" class="error"></div>
+            <div id="loading-message" class="loading">${t.processing}</div>
+            
+            <div id="success-popup-overlay" class="success-popup-overlay"></div>
+            <div id="success-popup" class="success-popup">
+              <div class="success-icon">✓</div>
+              <div class="success-title">${t.success_title}</div>
+            </div>
+            
+            <div class="section">
+              <div class="section-title">${t.customer_info}</div>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="firstName">${t.first_name} *</label>
+                  <input type="text" id="firstName" required>
+                </div>
+                <div class="form-group">
+                  <label for="lastName">${t.last_name} *</label>
+                  <input type="text" id="lastName" required>
+                </div>
+              </div>
+              
+              <div class="form-group">
+                <label for="email">${t.email} *</label>
+                <input type="email" id="email" required>
+              </div>
+              
+              <div class="form-group">
+                <label for="phone">${t.phone}</label>
+                <input type="tel" id="phone">
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">${t.billing_address}</div>
+              
+              <div class="form-group">
+                <label for="address">${t.address} *</label>
+                <input type="text" id="address" required>
+              </div>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="postalCode">${t.postal_code} *</label>
+                  <input type="text" id="postalCode" required>
+                </div>
+                <div class="form-group">
+                  <label for="city">${t.city} *</label>
+                  <input type="text" id="city" required>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">${t.payment_details}</div>
+              <div id="sumup-card"></div>
+            </div>
+          </div>
+
+          <script>
+            let customerData = {};
+            const cartData = ${cartData ? JSON.stringify(cartData) : 'null'};
+            const checkoutId = '${checkout.id}';
+            let pollingInterval = null;
+            const t = ${JSON.stringify(t)};
+
+            function validateCustomerInfo() {
+              const firstName = document.getElementById('firstName').value.trim();
+              const lastName = document.getElementById('lastName').value.trim();
+              const email = document.getElementById('email').value.trim();
+              const address = document.getElementById('address').value.trim();
+              const postalCode = document.getElementById('postalCode').value.trim();
+              const city = document.getElementById('city').value.trim();
+              
+              if (!firstName || !lastName || !email || !address || !postalCode || !city) {
+                return false;
+              }
+              
+              customerData = {
+                firstName,
+                lastName,
+                email,
+                phone: document.getElementById('phone').value.trim(),
+                address,
+                postalCode,
+                city
+              };
+              
+              return true;
+            }
+
+            async function checkPaymentStatus() {
+              try {
+                const response = await fetch('/api/check-payment/' + checkoutId);
+                const data = await response.json();
+                
+                if (data.status === 'PAID') {
+                  if (pollingInterval) clearInterval(pollingInterval);
+                  
+                  document.getElementById('loading-message').style.display = 'block';
+                  document.getElementById('loading-message').innerHTML = '✓ ' + t.success_title;
+                  
+                  await fetch('/api/save-customer-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ checkoutId, customerData, cartData })
+                  });
+                  
+                  document.getElementById('loading-message').style.display = 'none';
+                  document.getElementById('success-popup-overlay').classList.add('show');
+                  document.getElementById('success-popup').classList.add('show');
+                  
+                  setTimeout(() => {
+                    window.location.href = '${return_url || APP_URL}';
+                  }, 2000);
+                } else if (data.status === 'FAILED') {
+                  if (pollingInterval) clearInterval(pollingInterval);
+                  document.getElementById('loading-message').style.display = 'none';
+                  document.getElementById('error-message').style.display = 'block';
+                  document.getElementById('error-message').innerHTML = '✗ ' + t.failed;
+                }
+              } catch (error) {
+                console.error('Error:', error);
+              }
+            }
+
+            function startPolling() {
+              checkPaymentStatus();
+              pollingInterval = setInterval(checkPaymentStatus, 2000);
+              setTimeout(() => { if (pollingInterval) clearInterval(pollingInterval); }, 120000);
+            }
+
+            SumUpCard.mount({
+              checkoutId: checkoutId,
+              showSubmitButton: true,
+              locale: t.locale,
+              onResponse: function(type, body) {
+                const errorDiv = document.getElementById('error-message');
+                const loadingDiv = document.getElementById('loading-message');
+                
+                switch(type) {
+                  case 'sent':
+                    if (!validateCustomerInfo()) {
+                      errorDiv.style.display = 'block';
+                      errorDiv.innerHTML = '✗ ' + t.fill_fields;
+                      return;
+                    }
+                    loadingDiv.style.display = 'block';
+                    loadingDiv.innerHTML = t.processing;
+                    startPolling();
+                    break;
+                    
+                  case 'auth-screen':
+                    loadingDiv.style.display = 'block';
+                    loadingDiv.innerHTML = t.verifying;
+                    if (!pollingInterval) startPolling();
+                    break;
+                    
+                  case 'success':
+                    loadingDiv.style.display = 'block';
+                    loadingDiv.innerHTML = t.confirming;
+                    if (!pollingInterval) startPolling();
+                    break;
+                    
+                  case 'error':
+                    if (pollingInterval) clearInterval(pollingInterval);
+                    loadingDiv.style.display = 'none';
+                    errorDiv.style.display = 'block';
+                    errorDiv.innerHTML = '✗ ' + t.failed + ': ' + (body.message || '');
+                    break;
+                    
+                  case 'invalid':
+                    if (pollingInterval) clearInterval(pollingInterval);
+                    loadingDiv.style.display = 'none';
+                    errorDiv.style.display = 'block';
+                    errorDiv.innerHTML = '✗ ' + t.invalid;
+                    break;
+                }
+              }
+            });
+          </script>
+        </body>
+      </html>
+    `);
+
   } catch (error) {
-    console.error('Webhook error:', error);
-    res.status(500).send('Error');
+    console.error('Error:', error.message);
+    const t = translations[lang];
+    res.status(500).send(`
+      <html>
+        <head><title>Payment Error</title></head>
+        <body style="font-family: Arial; text-align: center; padding: 50px;">
+          <h1>${t.error_title}</h1>
+          <p>${t.error_text}</p>
+          <p style="color: #666; font-size: 14px;">${error.message}</p>
+        </body>
+      </html>
+    `);
   }
 });
 
