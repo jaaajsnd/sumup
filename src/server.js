@@ -10,7 +10,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-const SUMUP_API_KEY = process.env.SUMUP_API_KEY || 'sup_sk_btkVjoMOqjRgBnJDe3HfRu6QY44IWUHi0';
+const SUMUP_API_KEY = process.env.SUMUP_API_KEY || 'sup_sk_K7IKsV5semQPE2OncHfjpPb27YU2hqkTH';
 const SUMUP_BASE_URL = 'https://api.sumup.com/v0.1';
 const APP_URL = process.env.APP_URL || 'http://localhost:10000';
 
