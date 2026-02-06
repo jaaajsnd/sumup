@@ -153,6 +153,30 @@ app.get('/health', (req, res) => {
   res.json({ status: 'healthy' });
 });
 
+app.get('/account-info', async (req, res) => {
+  try {
+    const response = await axios.get(`${SUMUP_BASE_URL}/me`, {
+      headers: {
+        'Authorization': `Bearer ${SUMUP_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const accountInfo = response.data;
+    
+    res.json({
+      merchant_code: accountInfo.merchant_code,
+      currency: accountInfo.merchant_profile?.currency_code,
+      country: accountInfo.merchant_profile?.country_code,
+      email: accountInfo.email,
+      business_name: accountInfo.merchant_profile?.business_name,
+      full_data: accountInfo
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message, details: error.response?.data });
+  }
+});
+
 app.get('/test', (req, res) => {
   res.send(`
     <html>
