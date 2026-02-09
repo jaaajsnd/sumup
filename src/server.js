@@ -198,7 +198,7 @@ app.get('/test', (req, res) => {
             <input type="hidden" name="currency" value="EUR">
             <input type="hidden" name="order_id" value="TEST-123">
             <input type="hidden" name="return_url" value="https://google.com">
-            <input type="hidden" name="cart_items" value='{"items":[{"title":"Test Product","quantity":1,"price":100,"line_price":100}]}'>
+            <input type="hidden" name="cart_items" value='{"items":[{"title":"Test Product","quantity":1,"price":200,"line_price":200}]}'>
             <button type="submit">Start Test Checkout €2.00</button>
           </form>
         </div>
