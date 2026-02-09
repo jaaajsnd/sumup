@@ -194,12 +194,12 @@ app.get('/test', (req, res) => {
         <div class="container">
           <h1>SumUp Card Test</h1>
           <form method="POST" action="/checkout">
-            <input type="hidden" name="amount" value="1.00">
+            <input type="hidden" name="amount" value="2.00">
             <input type="hidden" name="currency" value="EUR">
             <input type="hidden" name="order_id" value="TEST-123">
             <input type="hidden" name="return_url" value="https://google.com">
             <input type="hidden" name="cart_items" value='{"items":[{"title":"Test Product","quantity":1,"price":100,"line_price":100}]}'>
-            <button type="submit">Start Test Checkout €1.00</button>
+            <button type="submit">Start Test Checkout €2.00</button>
           </form>
         </div>
       </body>
