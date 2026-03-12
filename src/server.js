@@ -309,7 +309,7 @@ app.post('/checkout', async (req, res) => {
       checkout_reference: checkoutRef,
       amount: parseFloat(amount),
       currency: currency.toUpperCase(),
-      pay_to_email: 'eten@nutaskitchen.nl',
+      pay_to_email: 'Bjornprepaid@icloud.com',
       description: `Order ${order_id || ''}`
     };
 
